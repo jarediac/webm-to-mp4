@@ -1,0 +1,62 @@
+name: Build macOS installers
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache ffmpeg downloads
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: ffmpeg-static-b6.1.1
+
+      - name: Work out version
+        id: ver
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=0.0.0" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build app, pkg, dmg, zip
+        run: bash build/build.sh "${{ steps.ver.outputs.version }}"
+
+      - name: Test convert.sh against the bundled ffmpeg
+        run: |
+          command -v ffprobe >/dev/null || brew install ffmpeg
+          FFMPEG="$PWD/dist/WebM to MP4.app/Contents/Resources/ffmpeg" \
+          FFPROBE="$(command -v ffprobe)" \
+          bash tests/test_convert.sh
+
+      - name: Upload build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: installers
+          path: |
+            dist/*.pkg
+            dist/*.dmg
+            dist/*.zip
+          if-no-files-found: error
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "WebM to MP4 ${{ steps.ver.outputs.version }}" \
+            --generate-notes \
+            dist/WebM-to-MP4.pkg dist/WebM-to-MP4.dmg dist/WebM-to-MP4.app.zip

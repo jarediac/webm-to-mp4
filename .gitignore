@@ -1,0 +1,4 @@
+dist/
+.cache/
+*.part.mp4
+.DS_Store
