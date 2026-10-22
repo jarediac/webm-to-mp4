@@ -84,7 +84,7 @@ for attempt in 1 2 3; do
     break
   fi
   [ "$attempt" -lt 3 ] || { echo "hdiutil failed three times" >&2; exit 1; }
-  echo "hdiutil failed (attempt $attempt), retrying…" >&2
+  echo "hdiutil failed (attempt $attempt), retrying..." >&2
   sleep 5
 done
 rm -rf "$STAGE"
