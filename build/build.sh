@@ -78,7 +78,15 @@ STAGE="$DIST/dmg-stage"
 mkdir -p "$STAGE"
 cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
-hdiutil create -volname "$APP_NAME" -srcfolder "$STAGE" -ov -format UDZO "$DIST/$FILE_STEM.dmg" >/dev/null
+# HFS+ and a retry: GitHub's macOS runners intermittently fail APFS images with "No space left on device".
+for attempt in 1 2 3; do
+  if hdiutil create -volname "$APP_NAME" -srcfolder "$STAGE" -ov -fs HFS+ -format UDZO "$DIST/$FILE_STEM.dmg" >/dev/null; then
+    break
+  fi
+  [ "$attempt" -lt 3 ] || { echo "hdiutil failed three times" >&2; exit 1; }
+  echo "hdiutil failed (attempt $attempt), retrying…" >&2
+  sleep 5
+done
 rm -rf "$STAGE"
 
 echo "==> Done"
